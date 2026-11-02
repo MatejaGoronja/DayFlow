@@ -11,10 +11,11 @@ export default function Home(){
       <Navbar/>
       <main>
         <Hero/>
+        <Features/>
         <div className="h-[200vh]">
         {/* Temporary scroll testing */}
         </div>
-        <Features/>
+        
         <Pricing/>
         <Faq/>
       </main>
