@@ -4,6 +4,7 @@ import Features from "@/components/landing/Features";
 import Pricing from "@/components/landing/Pricing";
 import Faq from "@/components/landing/Faq";
 import Footer from "@/components/landing/Footer";
+import WaveDivider from "@/components/landing/WaveDivider";
 
 export default function Home(){
   return(
@@ -11,13 +12,13 @@ export default function Home(){
       <Navbar/>
       <main>
         <Hero/>
+        <WaveDivider/>
         <Features/>
-        <div className="h-[200vh]">
-        {/* Temporary scroll testing */}
-        </div>
-        
+        <WaveDivider flip/>
         <Pricing/>
+        <WaveDivider variant="layered"/>
         <Faq/>
+        <WaveDivider flip variant="curve"/>
       </main>
       <Footer/>
     </>
