@@ -103,6 +103,7 @@ export default function Features() {
                   key={feature.title}
                   type="button"
                   onClick={() => setActive(index)}
+                  aria-pressed={isActive}
                   className={`rounded-xl border p-4 text-left transition-colors ${
                     isActive
                       ? "border-border bg-white shadow-md"
@@ -111,7 +112,7 @@ export default function Features() {
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
                         isActive
                           ? "bg-primary text-white"
                           : "bg-primary-soft text-primary"
@@ -119,7 +120,13 @@ export default function Features() {
                     >
                       <feature.icon size={20} />
                     </span>
-                    <span className="font-bold">{feature.title}</span>
+                    <span className="flex-1 font-bold">{feature.title}</span>
+
+                    <span aria-hidden='true' className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors border-primary">
+                      <span className={`h-2.5 w-2.5 rounded-full bg-primary transition-transform duration-200 ${
+                        isActive ? "scale-100" : "scale-0"
+                      }`}/>
+                    </span>
                   </div>
 
                   {isActive && (

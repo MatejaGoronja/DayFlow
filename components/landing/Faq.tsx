@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from 'next/image';
 import Link from 'next/link';
 import { Send } from 'lucide-react';
+import Reveal from "./Reveal";
 
 const faqs = [
   {
@@ -36,11 +37,11 @@ export default function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return(
-    <section id="faq" className="scroll-mt-20 bg-surface py-20 md:py-28">
+    <section id="faq" className="scroll-mt-20 overflow-hidden bg-surface py-20 md:py-28">
       <div className="mx-auto max-w-7xl px-6">
         {/* Text + illustration */}
         <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="text-center lg:text-left">
+          <Reveal direction="left" className="text-center lg:text-left">
             <span className="inline-block rounded-full bg-primary-soft px-3 py-1 text-sm font-semibold text-primary">FAQ</span>
             <h2 className="mt-6 text-balance text-3xl font-extrabold tracking-tight sm:text-4xl">
               Frequently asked questions
@@ -51,11 +52,11 @@ export default function Faq() {
             </p>
             <Link href="mailto:hello@dayflow.com" className="mt-6 inline-block rounded-lg border border-border bg-white px-6 py-3 text-base font-semibold hover:bg-primary-hover/10 hover:text-primary">
             Contact Us</Link>
-          </div>
+          </Reveal>
 
-          <div className="flex justify-center lg:justify-end">
+          <Reveal direction="right" delay={150} className="flex justify-center lg:justify-end">
             <Image src="/FAQ.svg" alt="" width={500} height={400} aria-hidden='true' className="h-auto w-full max-w-sm lg:max-w-md"/>
-          </div>
+          </Reveal>
         </div>
 
         {/* Chat */}
