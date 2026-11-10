@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type Mode = "login" | "signup";
 type Errors = Partial<
@@ -47,6 +48,7 @@ export default function AuthForm({
   const [showPassword, setShowPassword] = useState(false);
   const text = copy[mode];
   const isSignup = mode === "signup";
+  const router = useRouter();
 
   const id = (field: string) => `${mode}-${field}`;
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -80,7 +82,7 @@ export default function AuthForm({
     if (Object.keys(newErrors).length > 0) return;
 
     //Backend
-    console.log({ mode, name, email });
+    router.push(isSignup ? "/login" : "/dashboard");
   }
 
   return (
