@@ -19,7 +19,7 @@ const features = [
     title: "Calendar",
     description:
       "See your week at a glance and plan events, meetings and deadlines in one view.",
-    image: "/Calendar.jpeg",
+    image: "/calendar-features.png",
   },
   {
     icon: ListChecks,
@@ -32,7 +32,7 @@ const features = [
     title: "Notes",
     description:
       "Write down ideas, meeting notes and anything you want to remember.",
-    image: "/Calendar.jpeg",
+    image: "/calendar-features.png",
   },
   {
     icon: ShoppingCart,
@@ -148,7 +148,7 @@ export default function Features() {
                 alt={`${current.title} preview`}
                 fill
                 sizes="(min-width: 1280px) 840px, (min-width: 576px) 576px, 100vw"
-                className="object-cover object-top"
+                className="object-contain object-top"
               />
             </div>
           </div>
