@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Minus, Pencil, Plus, Search, Trash2, } from "lucide-react";
+import { Check, Minus, Pencil, Plus, Search, Trash2, X, } from "lucide-react";
 import { field, formatPrice, type Entry, type Product, type ShopList } from "./shopping";
 
 type Props = {
@@ -24,6 +24,9 @@ export default function ListsTab({
     const [renaming, setRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState("");
     const [query, setQuery] = useState("");
+    const [customPrice, setCustomPrice] = useState("");
+    const [customOpen, setCustomOpen] = useState(false);
+    const [customError, setCustomError] = useState("");
 
     const active = lists.find((l) => l.id === activeId) ?? lists[0] ?? null;
 
@@ -84,19 +87,39 @@ export default function ListsTab({
         setQuery("");
     }
 
-    function addCustom(name: string) {
+    function parsePrice(value: string): number | null | undefined {
+        const trimmed = value.trim().replace(",", ".");
+        if(trimmed === "") return null;
+        const n = Number(trimmed);
+        return Number.isFinite(n) && n >= 0 ? n : undefined;
+    }
+
+    function closeCustom() {
+        setCustomOpen(false);
+        setCustomPrice("");
+        setCustomError("");
+    }
+
+    function confirmCustom(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        const price = parsePrice(customPrice);
+        if(price === undefined) {
+            setCustomError("Enter a valid price.");
+            return;
+        }
         updateEntries((entries) => [
             {
                 id: crypto.randomUUID(),
                 productId: null,
-                name,
-                price: null,
+                name: query.trim(),
+                price,
                 quantity: 1,
                 checked: false,
             },
             ...entries,
         ]);
         setQuery("");
+        closeCustom();
     }
 
     const toggle = (id: string) => updateEntries((entries) =>
@@ -125,7 +148,7 @@ export default function ListsTab({
         e.preventDefault();
         if(!trimmedQuery) return;
         if(matches.length > 0) addProduct(matches[0]);
-        else addCustom(trimmedQuery);
+        else setCustomOpen(true);
     }
 
 
@@ -144,6 +167,7 @@ export default function ListsTab({
                         setActiveId(l.id);
                         setRenaming(false);
                         setQuery("");
+                        closeCustom();
                     }}
                     aria-pressed={active?.id === l.id}
                     className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
@@ -247,7 +271,10 @@ export default function ListsTab({
                     <div className="relative">
                         <form onSubmit={handleSearchSubmit} className="relative">
                             <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted"/>
-                            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery("")} 
+                            <input type="text" value={query} onChange={(e) => {
+                                setQuery(e.target.value);
+                                if(customOpen) closeCustom();
+                            }} onKeyDown={(e) => e.key === "Escape" && setQuery("")} 
                             placeholder="Search your items and add them to this list..." aria-label="Search items" className={`${field} w-full py-3 pl-11 placeholder:text-muted/60`} />
                         </form>
 
@@ -264,12 +291,32 @@ export default function ListsTab({
                                         </button>
                                     </li>
                                 ))}
-                                {!hasExactMatch && (
+                                {!hasExactMatch && !customOpen && (
                                     <li>
-                                        <button type="button" onClick={() => addCustom(trimmedQuery)} className="flex w-full items-center gap-2 border-t border-border px-4 py-3 text-left text-sm font-semibold text-primary transition-colors hover:bg-primary-hover/10">
+                                        <button type="button" onClick={() => setCustomOpen(true)}
+                                        className="flex w-full items-center gap-2 border-t border-border px-4 py-3 text-left text-sm font-semibold text-primary transition-colors hover:bg-primary-hover/10">
                                             <Plus size={16}/>
                                             Add &quot;{trimmedQuery}&quot; as a custom item
                                         </button>
+                                    </li>
+                                )}
+                                {customOpen && (
+                                    <li className="border-t border-border p-3">
+                                        <form onSubmit={confirmCustom} className="space-y-2">
+                                            <p className="text-sm font-semibold">
+                                                Custom item: <span className="text-primary">{trimmedQuery}</span>
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <input autoFocus type="text" inputMode="decimal" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} onKeyDown={(e) => e.key === "Escape" && closeCustom()} placeholder="Price (optional)" aria-label="Price" className={`${field} min-w-0 flex-1`} />
+                                                <button type="submit" aria-label="Add item" className="rounded-lg bg-primary p-2.5 text-white transition-colors hover:bg-primary-hover">
+                                                    <Check size={18}/>
+                                                </button>
+                                                <button type="button" onClick={closeCustom} aria-label="Cancel" className="rounded-lg border border-border p-2.5 text-muted transition-colors hover:bg-surface">
+                                                    <X size={18}/>
+                                                </button>
+                                            </div>
+                                            {customError && <p className="text-sm text-red-500">{customError}</p>}
+                                        </form>
                                     </li>
                                 )}
                             </ul>
