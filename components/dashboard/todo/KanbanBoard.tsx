@@ -1,20 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
-
-type Status = "todo" | "progress" | "done";
-type Priority = "low" | "medium" | "high";
-
-type Task = {
-  id: string;
-  title: string;
-  priority: Priority;
-  due: string;
-  status: Status;
-};
-
-type TaskInput = Pick<Task, "title" | "priority" | "due">;
+import { useState } from "react";
+import { ArrowLeft, ArrowRight, Bell, CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { useDashboard } from "../store/DashboardProvider";
+import { dayNumber, parseKey, taskRemindOptions, toKey, type Priority, type Remind, type Status, type Task, type TaskInput } from "../store/dashboard";
 
 type ColumnDef = {status: Status; title: string; short: string; dot: string};
 
@@ -38,47 +27,12 @@ const priorityBadge: Record<Priority, string> = {
 
 const priorityRank: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
-const initialTasks: Task[] = [
-  { id: "1", title: "Finish project report", priority: "high", due: "2026-11-30", status: "todo" },
-  { id: "2", title: "Buy groceries", priority: "low", due: "", status: "todo" },
-  { id: "3", title: "Design the calendar page", priority: "medium", due: "2026-11-23", status: "progress" },
-  { id: "4", title: "Plan the week", priority: "medium", due: "", status: "done" },
-  { id: "5", title: "Send the assignment", priority: "high", due: "2026-11-25", status: "todo" },
-];
-
-const pad = (n: number) => String(n).padStart(2, "0");
-const toKey = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
-
-function parseKey(key: string) {
-  return {
-    y: Number(key.slice(0, 4)),
-    m: Number(key.slice(5, 7)) - 1,
-    d: Number(key.slice(8, 10)),
-  };
-}
-
-function dayNumber(key: string) {
-  const { y, m, d } = parseKey(key);
-  return Math.round(Date.UTC(y, m, d) / 86_400_000);
-}
-
 function formatDate(date: string) {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
   });
-}
-
-function subscribe() {
-  return () => {};
-}
-function getToday() {
-  const now = new Date();
-  return toKey(now.getFullYear(), now.getMonth(), now.getDate());
-}
-function getServerToday() {
-  return "";
 }
 
 type DueInfo = { label: string; chip: string; overdue: boolean } | null;
@@ -232,7 +186,13 @@ function TaskForm({ initial, today, onSubmit, onCancel }: TaskFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? "medium");
   const [due, setDue] = useState(initial?.due ?? "");
+  const [remind, setRemind] = useState<Remind>(initial?.remind ?? "none");
   const [error, setError] = useState("");
+
+  function handleDueChange(value: string) {
+    setDue(value);
+    if(!value) setRemind("none");
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -241,7 +201,7 @@ function TaskForm({ initial, today, onSubmit, onCancel }: TaskFormProps) {
       setError("Please enter a task title.");
       return;
     }
-    onSubmit({ title: trimmed, priority, due });
+    onSubmit({ title: trimmed, priority, due, remind });
   }
 
   return (
@@ -266,7 +226,16 @@ function TaskForm({ initial, today, onSubmit, onCancel }: TaskFormProps) {
           <option value="high">High priority</option>
       </select>
 
-      <DatePicker value={due} today={today} onChange={setDue}/>
+      <DatePicker value={due} today={today} onChange={handleDueChange}/>
+
+      <select value={remind} onChange={(e) => setRemind(e.target.value as Remind)} disabled={!due} aria-label="Remind me"
+        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primary disabled:opacity-50">
+          {taskRemindOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.value === "none" && !due ? "Reminder (set a due date first)" : o.label}
+            </option>
+          ))}
+      </select>
 
       <div className="flex gap-2">
         <button type="submit" className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover">
@@ -339,6 +308,12 @@ function TaskCard({
               {formatDate(task.due)}
             </span>
         ))}
+
+        {task.remind !== "none" && !done && (
+          <span title="Reminder set" className="text-muted">
+            <Bell size={13}/>
+          </span>
+        )}
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
@@ -485,31 +460,19 @@ function Column({
 }
 
 export default function KanbanBoard() {
-  const today = useSyncExternalStore(subscribe, getToday, getServerToday);
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const { ready, today, tasks, addTask, updateTask, moveTask, deleteTask } = useDashboard();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<Status | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tab, setTab] = useState<Status>("todo");
 
-  function moveTask(id: string, status: Status) {
-    setTasks((current) => current.map((t) => (t.id === id ? {...t, status} : t)));
+  if(!ready){
+    return <div className="mt-8 h-96 animate-pulse rounded-2xl bg-white/60"/>;
   }
 
-  function updateTask(id: string, input: TaskInput) {
-    setTasks((current) => current.map((t) => (t.id === id ? {...t, ...input} : t)));
+  function handleUpdate(id: string, input: TaskInput) {
+    updateTask(id, input);
     setEditingId(null);
-  }
-
-  function deleteTask(id: string){
-    setTasks((current) => current.filter((t) => t.id !== id));
-  }
-
-  function addTask(status: Status, input: TaskInput) {
-    setTasks((current) => [
-      ...current,
-      {id: crypto.randomUUID(), status, ...input},
-    ]);
   }
 
   function handleDrop(status: Status, id: string){
@@ -578,7 +541,7 @@ export default function KanbanBoard() {
             onMove={moveTask}
             onEdit={setEditingId}
             onCancelEdit={() => setEditingId(null)}
-            onUpdate={updateTask}
+            onUpdate={handleUpdate}
             onDelete={deleteTask}
             onAdd={addTask}
           />

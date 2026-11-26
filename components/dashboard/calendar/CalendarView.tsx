@@ -1,33 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { ChevronLeft, ChevronRight, Clock, Pencil, Plus, Repeat as RepeatIcon, Trash2 } from "lucide-react";
-
-type Category = "work" | "personal" | "study";
-type Freq = "none" | "daily" | "weekly" | "monthly" | "yearly";
-type EndType = "never" | "count" | "until";
-
-type Repeat = {
-    freq: Freq;
-    interval: number;
-    end: EndType;
-    count: number;
-    until: string;
-}
-
-type CalEvent = {
-    id: string;
-    title: string;
-    date: string;
-    start: string;
-    end: string;
-    category: Category;
-    repeat: Repeat;
-};
-
-type EventInput = Omit<CalEvent, "id" | "date">;
-
-const USE_12H = true;
+import { useState } from "react";
+import { Bell, ChevronLeft, ChevronRight, Clock, Pencil, Plus, Repeat as RepeatIcon, Trash2 } from "lucide-react";
+import { useDashboard } from "../store/DashboardProvider";
+import { describeRepeat, eventRemindLabel, eventRemindOptions, formatLong, formatTime, freqUnit, occursOn, parseKey, toKey, type CalEvent, type Category, type EndType, type EventInput, type Freq, type Remind, type Repeat } from "../store/dashboard";
 
 const categories: Record<Category, {label: string; dot: string; chip: string}> = {
     work: {label: "Work", dot: "bg-primary", chip: "bg-primary-soft text-primary"},
@@ -36,118 +12,6 @@ const categories: Record<Category, {label: string; dot: string; chip: string}> =
 };
 
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const noRepeat: Repeat = { freq: "none", interval: 1, end: "never", count: 10, until: ""};
-
-const freqUnit: Record<Exclude<Freq, "none">, string> = {
-    daily: "day",
-    weekly: "week",
-    monthly: "month",
-    yearly: "year",
-};
-
-const initialEvents: CalEvent[] = [
-  { id: "1", title: "Team meeting", date: "2026-11-12", start: "14:00", end: "15:00", category: "work", repeat: { ...noRepeat, freq: "weekly" } },
-  { id: "2", title: "Internet technologies lecture", date: "2026-11-13", start: "10:00", end: "12:00", category: "study", repeat: noRepeat },
-  { id: "3", title: "Dentist", date: "2026-11-16", start: "17:30", end: "18:00", category: "personal", repeat: noRepeat },
-  { id: "4", title: "Project deadline", date: "2026-11-20", start: "09:00", end: "10:00", category: "work", repeat: noRepeat },
-  { id: "5", title: "Study session", date: "2026-11-20", start: "18:00", end: "20:00", category: "study", repeat: noRepeat },
-  { id: "6", title: "Dog's birthday", date: "2026-11-25", start: "09:00", end: "10:00", category: "personal", repeat: { ...noRepeat, freq: "yearly" } },
-];
-
-const pad = (n: number) => String(n).padStart(2, "0");
-const toKey = (y: number, m: number, d: number) => `${y}-${pad(m+1)}-${pad(d)}`;
-
-function parseKey(key: string) {
-    return {
-        y: Number(key.slice(0, 4)),
-        m: Number(key.slice(5,7)) - 1,
-        d: Number(key.slice(8,10)),
-    };
-}
-
-function dayNumber(key: string){
-    const { y, m, d } = parseKey(key);
-    return Math.round(Date.UTC(y, m, d) / 86_400_000);
-}
-
-function formatTime(time:string){
-    if(!USE_12H) return time;
-    const [h, m] = time.split(":").map(Number);
-    return `${h % 12 || 12}:${pad(m)} ${h >= 12 ? "PM" : "AM"}`;
-}
-
-function formatLong(key: string, options: Intl.DateTimeFormatOptions){
-    const { y, m, d } = parseKey(key);
-    return new Date(y, m, d).toLocaleDateString("en-US", options);
-}
-
-function subscribe() {
-    return () => {};
-}
-
-function getToday() {
-    const now = new Date();
-    return toKey(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-function getServerToday(){
-    return "";
-}
-
-function occurenceNumber(ev: CalEvent, key: string): number | null {
-    const {freq, interval} = ev.repeat;
-    if(key < ev.date) return null;
-
-    if(freq === "none") return key === ev.date ? 0 : null;
-
-    if(freq === "daily" || freq === "weekly") {
-        const step = (freq === "daily" ? 1 : 7) * interval;
-        const diff = dayNumber(key) - dayNumber(ev.date);
-        return diff % step === 0 ? diff / step : null;
-    }
-
-    const s = parseKey(ev.date);
-    const k = parseKey(key);
-    const stepMonths = (freq === "monthly" ? 1 : 12) * interval;
-    const monthsDiff = (k.y - s.y) * 12 + (k.m - s.m);
-
-    if(k.d !== s.d || monthsDiff % stepMonths !== 0) return null;
-    if(freq === "yearly" && k.m !== s.m) return null;
-
-    let index = 0;
-    for (let j = 0; j < monthsDiff / stepMonths; j++){
-        const probe = new Date(s.y, s.m + j * stepMonths, s.d);
-        if(probe.getDate() === s.d) index++;
-    }
-    return index;
-}
-
-function occursOn(ev: CalEvent, key: string){
-    const n = occurenceNumber(ev, key);
-    if(n === null) return false;
-    if(ev.repeat.end === "count") return n < ev.repeat.count;
-    if(ev.repeat.end === "until") return key <= ev.repeat.until;
-    return true;
-}
-
-function describeRepeat(r: Repeat, date: string) {
-    if(r.freq === "none") return "Does not repeat";
-
-    const unit = freqUnit[r.freq];
-    let text = r.interval === 1 ? `Every ${unit}` : `Every ${r.interval} ${unit}s`;
-
-    if (r.freq === "weekly") text += ` on ${formatLong(date, { weekday: "long"})}`;
-    if (r.freq === "monthly") text += ` on day ${parseKey(date).d}`;
-    if (r.freq === "yearly") text += ` on ${formatLong(date, { month: "long", day: "numeric"})}`;
-
-    if (r.end === "count") text += `, ${r.count} times`;
-    if (r.end === "until" && r.until){
-        text += `, until ${formatLong(r.until, { month: "short", day: "numeric", year: "numeric"})}`;
-    } 
-
-    return text;
-}
 
 {/* Event form */}
 type EventFormProps = {
@@ -162,6 +26,7 @@ function EventForm({ date, initial, onSubmit, onCancel}: EventFormProps){
     const [start, setStart] = useState(initial?.start ?? "09:00");
     const [end, setEnd] = useState(initial?.end ?? "10:00");
     const [category, setCategory] = useState<Category>(initial?.category ?? "work");
+    const [remind, setRemind] = useState<Remind>(initial?.remind ?? "none");
     
     const [freq, setFreq] = useState<Freq>(initial?.repeat.freq ?? "none");
     const [interval, setIntervalValue] = useState(String(initial?.repeat.interval ?? 1));
@@ -189,7 +54,7 @@ function EventForm({ date, initial, onSubmit, onCancel}: EventFormProps){
             setError("Choose an end date that is not before the first event.");
             return;
         }
-        onSubmit({title: trimmed, start, end, category, repeat});
+        onSubmit({title: trimmed, start, end, category, repeat, remind});
     }
 
     const field = "w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -226,6 +91,17 @@ function EventForm({ date, initial, onSubmit, onCancel}: EventFormProps){
                         </option>
                 ))}
             </select>
+
+            <label className="block text-xs font-semibold text-muted">
+                Remind me
+                <select value={remind} onChange={(e) => setRemind(e.target.value as Remind)} className={`${field} mt-1`}>
+                    {eventRemindOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                            {o.label}
+                        </option>
+                    ))}
+                </select>
+            </label>
 
             {/* Repeat */}
             <div className="space-y-3 border-t border-border pt-3">
@@ -299,14 +175,13 @@ function EventForm({ date, initial, onSubmit, onCancel}: EventFormProps){
 }
 
 export default function CalendarView() {
-    const today = useSyncExternalStore(subscribe, getToday, getServerToday);
-    const [events, setEvents] = useState<CalEvent[]>(initialEvents);
+    const { ready, today, events, addEvent, updateEvent, deleteEvent } = useDashboard();
     const [viewState, setViewState] = useState<{ y:number, m:number } | null>(null);
     const [selectedState, setSelectedState] = useState<string | null>(null);
     const [adding, setAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    if(!today){
+    if(!ready){
         return <div className="mt-8 h-96 animate-pulse rounded-2xl bg-white/60"/>;
     }
 
@@ -360,21 +235,14 @@ export default function CalendarView() {
         if(!cell.inMonth) setViewState({ y:cell.y, m:cell.m});
     }
 
-    function addEvent(input: EventInput) {
-        setEvents((current) => [
-            ...current,
-            { id: crypto.randomUUID(), date: selected, ...input },
-        ]);
+    function handleAdd(input: EventInput) {
+        addEvent(selected, input);
         setAdding(false);
     }
 
-    function updateEvent(id: string, input: EventInput){
-        setEvents((current) => current.map((e) => (e.id === id ? { ...e, ...input } : e)));
+    function handleUpdate(id: string, input: EventInput) {
+        updateEvent(id, input);
         setEditingId(null);
-    }
-
-    function deleteEvent(id: string){
-        setEvents((current) => current.filter((e) => e.id !== id));
     }
 
     const navButton = "rounded-lg border border-border bg-white p-2 text-muted transition-colors hover:bg-primary-hover/10 hover:text-primary";
@@ -498,7 +366,7 @@ export default function CalendarView() {
                     {selectedEvents.map((ev) =>
                     editingId === ev.id ? (
                         <li key={ev.id}>
-                            <EventForm date={ev.date} initial={ev} onSubmit={(input) => updateEvent(ev.id, input)} onCancel={() => setEditingId(null)}/>
+                            <EventForm date={ev.date} initial={ev} onSubmit={(input) => handleUpdate(ev.id, input)} onCancel={() => setEditingId(null)}/>
                         </li>
                     ) : (
                         <li key={ev.id} className="group flex items-center gap-3 rounded-xl border border-border p-3">
@@ -513,6 +381,12 @@ export default function CalendarView() {
                                     <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                                         <RepeatIcon size={13}/>
                                         {describeRepeat(ev.repeat, ev.date)}
+                                    </p>
+                                )}
+                                {ev.remind !== "none" && (
+                                    <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                                        <Bell size={13}/>
+                                        {eventRemindLabel(ev.remind)}
                                     </p>
                                 )}
                             </div>
@@ -541,7 +415,7 @@ export default function CalendarView() {
 
                 {adding && (
                     <div className="mt-4">
-                        <EventForm date={selected} onSubmit={addEvent} onCancel={() => setAdding(false)}/>
+                        <EventForm date={selected} onSubmit={handleAdd} onCancel={() => setAdding(false)}/>
                     </div>
                 )}
             </aside>
